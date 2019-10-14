@@ -17,37 +17,124 @@
 package org.springframework.cloud.loadbalancer.annotation;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.CacheManager;
+import org.springframework.cloud.client.ConditionalOnBlockingDiscoveryEnabled;
+import org.springframework.cloud.client.ConditionalOnDiscoveryEnabled;
+import org.springframework.cloud.client.ConditionalOnReactiveDiscoveryEnabled;
+import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
+import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
+import org.springframework.cloud.loadbalancer.core.CachingServiceInstanceListSupplier;
 import org.springframework.cloud.loadbalancer.core.CachingServiceInstanceSupplier;
+import org.springframework.cloud.loadbalancer.core.DiscoveryClientServiceInstanceListSupplier;
 import org.springframework.cloud.loadbalancer.core.DiscoveryClientServiceInstanceSupplier;
+import org.springframework.cloud.loadbalancer.core.ReactorLoadBalancer;
+import org.springframework.cloud.loadbalancer.core.RoundRobinLoadBalancer;
+import org.springframework.cloud.loadbalancer.core.ServiceInstanceListSupplier;
 import org.springframework.cloud.loadbalancer.core.ServiceInstanceSupplier;
+import org.springframework.cloud.loadbalancer.support.LoadBalancerClientFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 
 /**
  * @author Spencer Gibb
+ * @author Olga Maciaszek-Sharma
+ * @author Tim Ysewyn
  */
 @Configuration
 @EnableConfigurationProperties
+@ConditionalOnDiscoveryEnabled
 public class LoadBalancerClientConfiguration {
+
+	private static final int REACTIVE_SERVICE_INSTANCE_SUPPLIER_ORDER = 193827465;
 
 	@Bean
 	@ConditionalOnMissingBean
-	public ServiceInstanceSupplier discoveryClientServiceInstanceSupplier(
-			DiscoveryClient discoveryClient, Environment env,
-			ObjectProvider<CacheManager> cacheManager) {
-		// TODO: bean post processor to enable caching?
-		DiscoveryClientServiceInstanceSupplier delegate = new DiscoveryClientServiceInstanceSupplier(
-				discoveryClient, env);
-		if (cacheManager.getIfAvailable() != null) {
-			return new CachingServiceInstanceSupplier(delegate,
-					cacheManager.getIfAvailable());
+	public ReactorLoadBalancer<ServiceInstance> reactorServiceInstanceLoadBalancer(
+			Environment environment,
+			LoadBalancerClientFactory loadBalancerClientFactory) {
+		String name = environment.getProperty(LoadBalancerClientFactory.PROPERTY_NAME);
+		return new RoundRobinLoadBalancer(loadBalancerClientFactory.getLazyProvider(name,
+				ServiceInstanceListSupplier.class), name);
+	}
+
+	@Configuration
+	@ConditionalOnReactiveDiscoveryEnabled
+	@Order(REACTIVE_SERVICE_INSTANCE_SUPPLIER_ORDER)
+	public static class ReactiveSupportConfiguration {
+
+		@Bean
+		@ConditionalOnBean(ReactiveDiscoveryClient.class)
+		@ConditionalOnMissingBean
+		public ServiceInstanceListSupplier discoveryClientServiceInstanceListSupplier(
+				ReactiveDiscoveryClient discoveryClient, Environment env,
+				ObjectProvider<CacheManager> cacheManager) {
+			DiscoveryClientServiceInstanceListSupplier delegate = new DiscoveryClientServiceInstanceListSupplier(
+					discoveryClient, env);
+			if (cacheManager.getIfAvailable() != null) {
+				return new CachingServiceInstanceListSupplier(delegate,
+						cacheManager.getIfAvailable());
+			}
+			return delegate;
 		}
-		return delegate;
+
+		@Bean
+		@ConditionalOnBean(ReactiveDiscoveryClient.class)
+		@ConditionalOnMissingBean
+		public ServiceInstanceSupplier discoveryClientServiceInstanceSupplier(
+				ReactiveDiscoveryClient discoveryClient, Environment env,
+				ObjectProvider<CacheManager> cacheManager) {
+			DiscoveryClientServiceInstanceSupplier delegate = new DiscoveryClientServiceInstanceSupplier(
+					discoveryClient, env);
+			if (cacheManager.getIfAvailable() != null) {
+				return new CachingServiceInstanceSupplier(delegate,
+						cacheManager.getIfAvailable());
+			}
+			return delegate;
+		}
+
+	}
+
+	@Configuration
+	@ConditionalOnBlockingDiscoveryEnabled
+	@Order(REACTIVE_SERVICE_INSTANCE_SUPPLIER_ORDER + 1)
+	public static class BlockingSupportConfiguration {
+
+		@Bean
+		@ConditionalOnBean(DiscoveryClient.class)
+		@ConditionalOnMissingBean
+		public ServiceInstanceListSupplier discoveryClientServiceInstanceListSupplier(
+				DiscoveryClient discoveryClient, Environment env,
+				ObjectProvider<CacheManager> cacheManager) {
+			DiscoveryClientServiceInstanceListSupplier delegate = new DiscoveryClientServiceInstanceListSupplier(
+					discoveryClient, env);
+			if (cacheManager.getIfAvailable() != null) {
+				return new CachingServiceInstanceListSupplier(delegate,
+						cacheManager.getIfAvailable());
+			}
+			return delegate;
+		}
+
+		@Bean
+		@ConditionalOnBean(DiscoveryClient.class)
+		@ConditionalOnMissingBean
+		public ServiceInstanceSupplier discoveryClientServiceInstanceSupplier(
+				DiscoveryClient discoveryClient, Environment env,
+				ObjectProvider<CacheManager> cacheManager) {
+			DiscoveryClientServiceInstanceSupplier delegate = new DiscoveryClientServiceInstanceSupplier(
+					discoveryClient, env);
+			if (cacheManager.getIfAvailable() != null) {
+				return new CachingServiceInstanceSupplier(delegate,
+						cacheManager.getIfAvailable());
+			}
+			return delegate;
+		}
+
 	}
 
 }

@@ -27,8 +27,10 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cloud.client.ServiceInstance;
 
 /**
+ * @deprecated Use {@link CachingServiceInstanceListSupplier} instead.
  * @author Spencer Gibb
  */
+@Deprecated
 public class CachingServiceInstanceSupplier implements ServiceInstanceSupplier {
 
 	/**
@@ -46,10 +48,8 @@ public class CachingServiceInstanceSupplier implements ServiceInstanceSupplier {
 			CacheManager cacheManager) {
 		this.delegate = delegate;
 		this.serviceInstances = CacheFlux.lookup(key -> {
-			Cache cache = cacheManager.getCache(SERVICE_INSTANCE_CACHE_NAME); // TODO:
-			// configurable
-			// cache
-			// name
+			// TODO: configurable cache name
+			Cache cache = cacheManager.getCache(SERVICE_INSTANCE_CACHE_NAME);
 			List<ServiceInstance> list = cache.get(key, List.class);
 			if (list == null || list.isEmpty()) {
 				return Mono.empty();

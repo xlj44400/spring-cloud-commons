@@ -23,6 +23,7 @@ import org.reactivestreams.Publisher;
  *
  * @param <T> type of the response
  * @author Spencer Gibb
+ * @author Olga Maciaszek-Sharma
  */
 public interface ReactiveLoadBalancer<T> {
 
@@ -40,6 +41,13 @@ public interface ReactiveLoadBalancer<T> {
 
 	default Publisher<Response<T>> choose() { // conflicting name
 		return choose(REQUEST);
+	}
+
+	@FunctionalInterface
+	interface Factory<T> {
+
+		ReactiveLoadBalancer<T> getInstance(String serviceId);
+
 	}
 
 }

@@ -26,7 +26,9 @@ import org.springframework.cloud.loadbalancer.core.ServiceInstanceSupplier;
  * Utility class for service instances.
  *
  * @author Spencer Gibb
+ * @deprecated Use {@link ServiceInstanceListSuppliers} instead.
  */
+@Deprecated
 public final class ServiceInstanceSuppliers {
 
 	private ServiceInstanceSuppliers() {

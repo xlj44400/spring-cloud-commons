@@ -18,16 +18,12 @@ package org.springframework.cloud.client.loadbalancer.reactive;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
 import org.junit.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.WebApplicationType;
-import org.springframework.boot.autoconfigure.web.reactive.function.client.WebClientAutoConfiguration;
-import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.cloud.client.DefaultServiceInstance;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
@@ -38,15 +34,15 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import static org.assertj.core.api.BDDAssertions.then;
+import static org.springframework.cloud.client.loadbalancer.reactive.LoadBalancerTestUtils.getFilters;
 
 /**
  * @author Spencer Gibb
  * @author Tim Ysewyn
+ * @author Olga Maciaszek-Sharma
  */
 public class ReactiveLoadBalancerAutoConfigurationTests {
 
@@ -61,19 +57,6 @@ public class ReactiveLoadBalancerAutoConfigurationTests {
 		then(webClientBuilder).isNotNull();
 
 		assertLoadBalanced(webClientBuilder);
-	}
-
-	private void assertLoadBalanced(WebClient.Builder webClientBuilder) {
-		List<ExchangeFilterFunction> filters = getFilters(webClientBuilder);
-		then(filters).hasSize(1);
-		ExchangeFilterFunction interceptor = filters.get(0);
-		then(interceptor).isInstanceOf(LoadBalancerExchangeFilterFunction.class);
-	}
-
-	@SuppressWarnings("unchecked")
-	private List<ExchangeFilterFunction> getFilters(WebClient.Builder builder) {
-		return (List<ExchangeFilterFunction>) ReflectionTestUtils.getField(builder,
-				"filters");
 	}
 
 	@Test
@@ -107,12 +90,29 @@ public class ReactiveLoadBalancerAutoConfigurationTests {
 		then(getFilters(builder)).isNullOrEmpty();
 	}
 
-	protected ConfigurableApplicationContext init(Class<?> config) {
-		return new SpringApplicationBuilder().web(WebApplicationType.NONE)
-				// .properties("spring.aop.proxyTargetClass=true")
-				.sources(config, WebClientAutoConfiguration.class,
-						ReactiveLoadBalancerAutoConfiguration.class)
-				.run();
+	@Test
+	public void autoConfigurationNotLoadedWhenReactorLoadBalancerExchangeFilterFunctionPresent() {
+		ConfigurableApplicationContext context = init(
+				ReactorLoadBalancerClientPresent.class);
+		final Map<String, WebClient.Builder> webClientBuilders = context
+				.getBeansOfType(WebClient.Builder.class);
+
+		then(webClientBuilders).hasSize(1);
+
+		WebClient.Builder builder = context.getBean(WebClient.Builder.class);
+
+		then(builder).isNotNull();
+		then(getFilters(builder)).isNullOrEmpty();
+	}
+
+	private ConfigurableApplicationContext init(Class<?> config) {
+		return LoadBalancerTestUtils.init(config,
+				ReactiveLoadBalancerAutoConfiguration.class);
+	}
+
+	private void assertLoadBalanced(WebClient.Builder builder) {
+		LoadBalancerTestUtils.assertLoadBalanced(builder,
+				LoadBalancerExchangeFilterFunction.class);
 	}
 
 	@Configuration
@@ -127,6 +127,22 @@ public class ReactiveLoadBalancerAutoConfigurationTests {
 		LoadBalancedRetryFactory loadBalancedRetryFactory() {
 			return new LoadBalancedRetryFactory() {
 			};
+		}
+
+	}
+
+	@Configuration
+	protected static class ReactorLoadBalancerClientPresent extends OneWebClientBuilder {
+
+		@Bean
+		ReactiveLoadBalancer.Factory<ServiceInstance> reactiveLoadBalancerFactory() {
+			return serviceId -> new TestReactiveLoadBalancer();
+		}
+
+		@Bean
+		ReactorLoadBalancerExchangeFilterFunction reactorLoadBalancerExchangeFilterFunction() {
+			return new ReactorLoadBalancerExchangeFilterFunction(
+					reactiveLoadBalancerFactory());
 		}
 
 	}
