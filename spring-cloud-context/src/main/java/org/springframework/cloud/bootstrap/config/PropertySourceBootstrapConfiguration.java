@@ -36,7 +36,6 @@ import org.springframework.boot.logging.LogFile;
 import org.springframework.boot.logging.LoggingInitializationContext;
 import org.springframework.boot.logging.LoggingSystem;
 import org.springframework.cloud.bootstrap.BootstrapApplicationListener;
-import org.springframework.cloud.bootstrap.support.OriginTrackedCompositePropertySource;
 import org.springframework.cloud.context.environment.EnvironmentChangeEvent;
 import org.springframework.cloud.logging.LoggingRebinder;
 import org.springframework.context.ApplicationContextInitializer;
@@ -53,11 +52,13 @@ import org.springframework.core.env.StandardEnvironment;
 import org.springframework.util.ResourceUtils;
 import org.springframework.util.StringUtils;
 
+import static org.springframework.core.env.StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME;
+
 /**
  * @author Dave Syer
  *
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(PropertySourceBootstrapProperties.class)
 public class PropertySourceBootstrapConfiguration implements
 		ApplicationContextInitializer<ConfigurableApplicationContext>, Ordered {
@@ -88,27 +89,31 @@ public class PropertySourceBootstrapConfiguration implements
 
 	@Override
 	public void initialize(ConfigurableApplicationContext applicationContext) {
-		CompositePropertySource composite = new OriginTrackedCompositePropertySource(
-				BOOTSTRAP_PROPERTY_SOURCE_NAME);
+		List<PropertySource<?>> composite = new ArrayList<>();
 		AnnotationAwareOrderComparator.sort(this.propertySourceLocators);
 		boolean empty = true;
 		ConfigurableEnvironment environment = applicationContext.getEnvironment();
 		for (PropertySourceLocator locator : this.propertySourceLocators) {
-			PropertySource<?> source = null;
-			source = locator.locate(environment);
-			if (source == null) {
+			Collection<PropertySource<?>> source = locator.locateCollection(environment);
+			if (source == null || source.size() == 0) {
 				continue;
 			}
-			logger.info("Located property source: " + source);
-			composite.addPropertySource(source);
+			List<PropertySource<?>> sourceList = new ArrayList<>();
+			for (PropertySource<?> p : source) {
+				sourceList.add(new BootstrapPropertySource<>(p));
+			}
+			logger.info("Located property source: " + sourceList);
+			composite.addAll(sourceList);
 			empty = false;
 		}
 		if (!empty) {
 			MutablePropertySources propertySources = environment.getPropertySources();
 			String logConfig = environment.resolvePlaceholders("${logging.config:}");
 			LogFile logFile = LogFile.get(environment);
-			if (propertySources.contains(BOOTSTRAP_PROPERTY_SOURCE_NAME)) {
-				propertySources.remove(BOOTSTRAP_PROPERTY_SOURCE_NAME);
+			for (PropertySource<?> p : environment.getPropertySources()) {
+				if (p.getName().startsWith(BOOTSTRAP_PROPERTY_SOURCE_NAME)) {
+					propertySources.remove(p.getName());
+				}
 			}
 			insertPropertySources(propertySources, composite);
 			reinitializeLoggingSystem(environment, logConfig, logFile);
@@ -155,36 +160,49 @@ public class PropertySourceBootstrapConfiguration implements
 	}
 
 	private void insertPropertySources(MutablePropertySources propertySources,
-			CompositePropertySource composite) {
+			List<PropertySource<?>> composite) {
 		MutablePropertySources incoming = new MutablePropertySources();
-		incoming.addFirst(composite);
+		List<PropertySource<?>> reversedComposite = new ArrayList<>(composite);
+		// Reverse the list so that when we call addFirst below we are maintaining the
+		// same order of PropertySources
+		// Wherever we call addLast we can use the order in the List since the first item
+		// will end up before the rest
+		Collections.reverse(reversedComposite);
+		for (PropertySource<?> p : reversedComposite) {
+			incoming.addFirst(p);
+		}
 		PropertySourceBootstrapProperties remoteProperties = new PropertySourceBootstrapProperties();
 		Binder.get(environment(incoming)).bind("spring.cloud.config",
 				Bindable.ofInstance(remoteProperties));
 		if (!remoteProperties.isAllowOverride() || (!remoteProperties.isOverrideNone()
 				&& remoteProperties.isOverrideSystemProperties())) {
-			propertySources.addFirst(composite);
+			for (PropertySource<?> p : reversedComposite) {
+				propertySources.addFirst(p);
+			}
 			return;
 		}
 		if (remoteProperties.isOverrideNone()) {
-			propertySources.addLast(composite);
+			for (PropertySource<?> p : composite) {
+				propertySources.addLast(p);
+			}
 			return;
 		}
-		if (propertySources
-				.contains(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME)) {
+		if (propertySources.contains(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME)) {
 			if (!remoteProperties.isOverrideSystemProperties()) {
-				propertySources.addAfter(
-						StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
-						composite);
+				for (PropertySource<?> p : reversedComposite) {
+					propertySources.addAfter(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, p);
+				}
 			}
 			else {
-				propertySources.addBefore(
-						StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
-						composite);
+				for (PropertySource<?> p : composite) {
+					propertySources.addBefore(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, p);
+				}
 			}
 		}
 		else {
-			propertySources.addLast(composite);
+			for (PropertySource<?> p : composite) {
+				propertySources.addLast(p);
+			}
 		}
 	}
 

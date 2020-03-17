@@ -30,13 +30,14 @@ public interface ReactiveLoadBalancer<T> {
 	/**
 	 * Default implementation of a request.
 	 */
-	Request REQUEST = new DefaultRequest();
+	Request<DefaultRequestContext> REQUEST = new DefaultRequest();
 
 	/**
 	 * Choose the next server based on the load balancing algorithm.
 	 * @param request - incoming request
 	 * @return publisher for the response
 	 */
+	@SuppressWarnings("rawtypes")
 	Publisher<Response<T>> choose(Request request);
 
 	default Publisher<Response<T>> choose() { // conflicting name

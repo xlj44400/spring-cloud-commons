@@ -21,7 +21,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.autoconfigure.endpoint.condition.ConditionalOnEnabledEndpoint;
+import org.springframework.boot.actuate.autoconfigure.endpoint.condition.ConditionalOnAvailableEndpoint;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -47,10 +47,10 @@ import org.springframework.context.annotation.Configuration;
  * @author Olga Maciaszek-Sharma
  * @author Tim Ysewyn
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class CommonsClientAutoConfiguration {
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(HealthIndicator.class)
 	@EnableConfigurationProperties(DiscoveryClientHealthIndicatorProperties.class)
 	@ConditionalOnBean(DiscoveryClient.class)
@@ -84,7 +84,7 @@ public class CommonsClientAutoConfiguration {
 
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(Endpoint.class)
 	@ConditionalOnProperty(value = "spring.cloud.features.enabled", matchIfMissing = true)
 	protected static class ActuatorConfiguration {
@@ -93,7 +93,7 @@ public class CommonsClientAutoConfiguration {
 		private List<HasFeatures> hasFeatures = new ArrayList<>();
 
 		@Bean
-		@ConditionalOnEnabledEndpoint
+		@ConditionalOnAvailableEndpoint
 		public FeaturesEndpoint featuresEndpoint() {
 			return new FeaturesEndpoint(this.hasFeatures);
 		}

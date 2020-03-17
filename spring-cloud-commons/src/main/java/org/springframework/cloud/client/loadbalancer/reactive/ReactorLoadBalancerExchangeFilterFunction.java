@@ -17,7 +17,6 @@
 package org.springframework.cloud.client.loadbalancer.reactive;
 
 import java.net.URI;
-import java.util.Objects;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -41,7 +40,7 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 public class ReactorLoadBalancerExchangeFilterFunction implements ExchangeFilterFunction {
 
 	private static final Log LOG = LogFactory
-			.getLog(LoadBalancerExchangeFilterFunction.class);
+			.getLog(ReactorLoadBalancerExchangeFilterFunction.class);
 
 	private final ReactiveLoadBalancer.Factory<ServiceInstance> loadBalancerFactory;
 
@@ -78,15 +77,19 @@ public class ReactorLoadBalancerExchangeFilterFunction implements ExchangeFilter
 			if (LOG.isDebugEnabled()) {
 				LOG.debug(String.format(
 						"Load balancer has retrieved the instance for service %s: %s",
-						serviceId, Objects.requireNonNull(instance).getUri()));
+						serviceId, instance.getUri()));
 			}
 			ClientRequest newRequest = buildClientRequest(request,
-					LoadBalancerUriTools.reconstructURI(instance, originalUrl));
+					reconstructURI(instance, originalUrl));
 			return next.exchange(newRequest);
 		});
 	}
 
-	private Mono<Response<ServiceInstance>> choose(String serviceId) {
+	protected URI reconstructURI(ServiceInstance instance, URI original) {
+		return LoadBalancerUriTools.reconstructURI(instance, original);
+	}
+
+	protected Mono<Response<ServiceInstance>> choose(String serviceId) {
 		ReactiveLoadBalancer<ServiceInstance> loadBalancer = loadBalancerFactory
 				.getInstance(serviceId);
 		if (loadBalancer == null) {

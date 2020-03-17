@@ -21,22 +21,27 @@ import java.util.List;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
-import org.springframework.cloud.client.loadbalancer.reactive.ReactiveLoadBalancerAutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.client.loadbalancer.reactive.LoadBalancerBeanPostProcessorAutoConfiguration;
+import org.springframework.cloud.client.loadbalancer.reactive.LoadBalancerProperties;
 import org.springframework.cloud.client.loadbalancer.reactive.ReactorLoadBalancerClientAutoConfiguration;
 import org.springframework.cloud.loadbalancer.annotation.LoadBalancerClientSpecification;
 import org.springframework.cloud.loadbalancer.annotation.LoadBalancerClients;
 import org.springframework.cloud.loadbalancer.support.LoadBalancerClientFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 /**
  * @author Spencer Gibb
  * @author Olga Maciaszek-Sharma
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @LoadBalancerClients
+@EnableConfigurationProperties(LoadBalancerProperties.class)
 @AutoConfigureBefore({ ReactorLoadBalancerClientAutoConfiguration.class,
-		ReactiveLoadBalancerAutoConfiguration.class })
+		LoadBalancerBeanPostProcessorAutoConfiguration.class })
 public class LoadBalancerAutoConfiguration {
 
 	private final ObjectProvider<List<LoadBalancerClientSpecification>> configurations;
@@ -46,6 +51,14 @@ public class LoadBalancerAutoConfiguration {
 		this.configurations = configurations;
 	}
 
+	@Bean
+	@ConditionalOnMissingBean
+	public LoadBalancerZoneConfig zoneConfig(Environment environment) {
+		return new LoadBalancerZoneConfig(
+				environment.getProperty("spring.cloud.loadbalancer.zone"));
+	}
+
+	@ConditionalOnMissingBean
 	@Bean
 	public LoadBalancerClientFactory loadBalancerClientFactory() {
 		LoadBalancerClientFactory clientFactory = new LoadBalancerClientFactory();

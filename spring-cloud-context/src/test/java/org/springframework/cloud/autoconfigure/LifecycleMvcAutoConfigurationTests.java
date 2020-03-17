@@ -50,20 +50,22 @@ public class LifecycleMvcAutoConfigurationTests {
 
 	@Test
 	public void environmentWebEndpointExtensionDisabled() {
-		beanNotCreated("environmentWebEndpointExtension",
+		beanNotCreated("writableEnvironmentEndpointWebExtension",
 				"management.endpoint.env.enabled=false");
 	}
 
 	@Test
 	public void environmentWebEndpointExtensionGloballyDisabled() {
-		beanNotCreated("environmentWebEndpointExtension",
+		beanNotCreated("writableEnvironmentEndpointWebExtension",
 				"management.endpoints.enabled-by-default=false");
 	}
 
 	@Test
 	public void environmentWebEndpointExtensionEnabled() {
-		beanCreated("environmentEndpointWebExtension",
-				"management.endpoint.env.enabled=true");
+		beanCreated("writableEnvironmentEndpointWebExtension",
+				"management.endpoint.env.enabled=true",
+				"management.endpoint.env.post.enabled=true",
+				"management.endpoints.web.exposure.include=env");
 	}
 
 	// restartEndpoint
@@ -80,7 +82,8 @@ public class LifecycleMvcAutoConfigurationTests {
 	@Test
 	public void restartEndpointEnabled() {
 		beanCreatedAndEndpointEnabled("restartEndpoint", RestartEndpoint.class,
-				RestartEndpoint::restart, "management.endpoint.restart.enabled=true");
+				RestartEndpoint::restart, "management.endpoint.restart.enabled=true",
+				"management.endpoints.web.exposure.include=restart");
 	}
 
 	// pauseEndpoint
@@ -105,6 +108,7 @@ public class LifecycleMvcAutoConfigurationTests {
 		beanCreatedAndEndpointEnabled("pauseEndpoint",
 				RestartEndpoint.PauseEndpoint.class, RestartEndpoint.PauseEndpoint::pause,
 				"management.endpoint.restart.enabled=true",
+				"management.endpoints.web.exposure.include=restart,pause",
 				"management.endpoint.pause.enabled=true");
 	}
 
@@ -112,12 +116,14 @@ public class LifecycleMvcAutoConfigurationTests {
 	@Test
 	public void resumeEndpointDisabled() {
 		beanNotCreated("resumeEndpoint", "management.endpoint.restart.enabled=true",
+				"management.endpoints.web.exposure.include=restart",
 				"management.endpoint.resume.enabled=false");
 	}
 
 	@Test
 	public void resumeEndpointRestartDisabled() {
 		beanNotCreated("resumeEndpoint", "management.endpoint.restart.enabled=false",
+				"management.endpoints.web.exposure.include=resume",
 				"management.endpoint.resume.enabled=true");
 	}
 
@@ -132,22 +138,23 @@ public class LifecycleMvcAutoConfigurationTests {
 				RestartEndpoint.ResumeEndpoint.class,
 				RestartEndpoint.ResumeEndpoint::resume,
 				"management.endpoint.restart.enabled=true",
-				"management.endpoint.resume.enabled=true");
+				"management.endpoint.resume.enabled=true",
+				"management.endpoints.web.exposure.include=restart,resume");
 	}
 
 	private void beanNotCreated(String beanName, String... contextProperties) {
 		try (ConfigurableApplicationContext context = getApplicationContext(Config.class,
 				contextProperties)) {
-			then(context.containsBeanDefinition(beanName)).as("bean was created")
-					.isFalse();
+			then(context.containsBeanDefinition(beanName))
+					.as("%s bean was created", beanName).isFalse();
 		}
 	}
 
 	private void beanCreated(String beanName, String... contextProperties) {
 		try (ConfigurableApplicationContext context = getApplicationContext(Config.class,
 				contextProperties)) {
-			then(context.containsBeanDefinition(beanName)).as("bean was not created")
-					.isTrue();
+			then(context.containsBeanDefinition(beanName))
+					.as("%s bean was not created", beanName).isTrue();
 		}
 	}
 
@@ -156,8 +163,8 @@ public class LifecycleMvcAutoConfigurationTests {
 			Function<T, Object> function, String... properties) {
 		try (ConfigurableApplicationContext context = getApplicationContext(Config.class,
 				properties)) {
-			then(context.containsBeanDefinition(beanName)).as("bean was not created")
-					.isTrue();
+			then(context.containsBeanDefinition(beanName))
+					.as("%s bean was not created", beanName).isTrue();
 
 			Object endpoint = context.getBean(beanName, type);
 			Object result = function.apply((T) endpoint);
@@ -166,7 +173,7 @@ public class LifecycleMvcAutoConfigurationTests {
 		}
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@EnableAutoConfiguration
 	static class Config {
 

@@ -30,7 +30,6 @@ import org.springframework.cloud.commons.util.InetUtils;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 
 /**
@@ -38,7 +37,7 @@ import org.springframework.core.annotation.Order;
  *
  * @author Biju Kunjummen
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @AutoConfigureBefore({ NoopDiscoveryClientAutoConfiguration.class,
 		CommonsClientAutoConfiguration.class })
 public class SimpleDiscoveryClientAutoConfiguration
@@ -68,9 +67,9 @@ public class SimpleDiscoveryClientAutoConfiguration
 	}
 
 	@Bean
-	@Order(Ordered.LOWEST_PRECEDENCE)
-	public DiscoveryClient simpleDiscoveryClient() {
-		return new SimpleDiscoveryClient(simpleDiscoveryProperties());
+	@Order
+	public DiscoveryClient simpleDiscoveryClient(SimpleDiscoveryProperties properties) {
+		return new SimpleDiscoveryClient(properties);
 	}
 
 	private int findPort() {

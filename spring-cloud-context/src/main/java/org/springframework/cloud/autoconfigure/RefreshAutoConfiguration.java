@@ -16,7 +16,6 @@
 
 package org.springframework.cloud.autoconfigure;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -61,7 +60,7 @@ import org.springframework.util.StringUtils;
  * @author Dave Syer
  * @author Venil Noronha
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(RefreshScope.class)
 @ConditionalOnProperty(name = RefreshAutoConfiguration.REFRESH_SCOPE_ENABLED,
 		matchIfMissing = true)
@@ -107,7 +106,7 @@ public class RefreshAutoConfiguration {
 		return new RefreshEventListener(contextRefresher);
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnClass(name = "javax.persistence.EntityManagerFactory")
 	protected static class JpaInvokerConfiguration implements LoadTimeWeaverAware {
 
@@ -140,8 +139,7 @@ public class RefreshAutoConfiguration {
 		 * Class names for beans to post process into refresh scope. Useful when you don't
 		 * control the bean definition (e.g. it came from auto-configuration).
 		 */
-		private Set<String> refreshables = new HashSet<>(
-				Arrays.asList("com.zaxxer.hikari.HikariDataSource"));
+		private Set<String> refreshables = new HashSet<>();
 
 		public Set<String> getRefreshable() {
 			return this.refreshables;
